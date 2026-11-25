@@ -33,3 +33,10 @@ class CheckInDecision(BaseModel):
     outcome: Literal["completed", "rescheduled", "cancelled", "unclear"]
     new_time: str | None = None
     message_to_user: str | None = None
+
+
+class RenegotiationDecision(BaseModel):
+    action: Literal["reschedule", "keep_as_is", "cancel", "ask_user"]
+    new_time: str | None = None
+    reason: str
+    message_to_user: str
