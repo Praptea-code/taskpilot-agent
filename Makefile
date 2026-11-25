@@ -26,4 +26,5 @@ demo-sales:
 	python scripts/demo_sales.py $(ARGS)
 
 demo-offline:
+	rm -f demo_sales.db
 	LLM_PROVIDER=fake DATABASE_URL=sqlite+aiosqlite:///./demo_sales.db python scripts/demo_sales.py --fake

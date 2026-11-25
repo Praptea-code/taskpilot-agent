@@ -4,14 +4,23 @@ An autonomous task execution agent that turns goals into scheduled actions using
 
 ## Quickstart
 
-Requirements: Python 3.12, Node 20 or newer, and Ollama for local inference.
+Requirements: Python 3.12, Node 20 or newer for the web client, and Ollama for local inference.
+
+Install and start Ollama, then pull a local model:
+
+```
+ollama pull qwen2.5:7b-instruct
+ollama serve
+```
+
+Install and start the API:
 
 ```
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
 python -m alembic upgrade head
-make dev
+make run
 ```
 
 The API listens on `http://localhost:8000`. Check it with:
@@ -117,4 +126,14 @@ make demo-offline
 python -m alembic upgrade head
 ```
 
-See `docs/DEMO.md` for the offline sales demo and optional voice setup. See `docs/DEPLOYMENT.md` for production notes.
+See `docs/DEMO.md` for the offline sales demo and optional voice setup. See `docs/ARCHITECTURE.md` for the component map, `docs/RUNBOOK.md` for operations, `docs/DEPLOYMENT.md` for production notes, and `CHANGELOG.md` for release history.
+
+## Troubleshooting
+
+- If a small model returns malformed JSON, set `LLM_MODEL=qwen2.5:7b-instruct` or switch to `LLM_PROVIDER=openai_compat` with a free hosted model. Structured calls retry up to three times and then raise a clear error.
+- If Ollama requests fail, confirm `ollama serve` is running and `OLLAMA_HOST` matches it. The error message names the model to pull.
+- If a request returns 401, create a user with `POST /users` and send the one-time key as `Authorization: Bearer`. In local tests only, `DEV_MODE=true` also accepts `X-User-Id`.
+- If a request returns 429, lower traffic or raise `RATE_LIMIT_PER_MINUTE`.
+- If email stays in the console, `SMTP_CONSOLE` is still true. Set it to false and configure SMTP settings.
+- If voice replies contain plain text bytes, Piper is not configured. Install the voice extra and set `PIPER_MODEL`.
+- If checks fail after a schema change, run `python -m alembic upgrade head`.
