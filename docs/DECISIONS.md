@@ -20,3 +20,4 @@
 - Commit 37: domain examples and payload builders live in `executors.domain_prompts`, so core only calls generic helpers.
 - Commit 38: no core refactor was needed because domain words only appear in imports and identifiers, not string literals.
 - Commit 39: no-reply follow-ups use a handler registered by domain and action type, with a three-touch escalation threshold.
+- Commit 40: the sales demo uses a frozen clock so canned deadlines, simulated replies, and monitor completion are deterministic offline.

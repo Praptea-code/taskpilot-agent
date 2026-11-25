@@ -38,3 +38,15 @@ Or select the fake provider through the environment:
 ```
 LLM_PROVIDER=fake python scripts/demo_calendar.py --goal "Prepare the quarterly report by tomorrow"
 ```
+
+## Sales follow-up demo
+
+The sales demo seeds five leads, creates one `send_email` action per lead, sends the first touches to the console backend, adds simulated replies, then runs the monitor to mark the actions complete:
+
+```
+make demo-sales
+make demo-sales ARGS="--fake"
+LLM_PROVIDER=fake python scripts/demo_sales.py
+```
+
+Set `SMTP_CONSOLE=false` and point `SMTP_HOST` at Mailpit when you want to inspect messages in a local inbox instead of the console.
