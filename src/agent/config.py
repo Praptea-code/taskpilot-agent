@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     timezone: str = "UTC"
     whisper_model: str = "base.en"
+    piper_model: str = ""
     grace_minutes: int = 10
     smtp_host: str = "localhost"
     smtp_port: int = 1025

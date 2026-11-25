@@ -1,4 +1,6 @@
 import asyncio
+import shutil
+import subprocess
 import tempfile
 
 from agent.config import get_settings
@@ -8,7 +10,9 @@ class VoiceChannel:
     name = "voice"
 
     def __init__(self, model_name: str | None = None) -> None:
-        self.model_name = model_name or get_settings().whisper_model
+        settings = get_settings()
+        self.model_name = model_name or settings.whisper_model
+        self.piper_model = settings.piper_model
         self._model: object | None = None
 
     def _load_model(self) -> object:
@@ -34,3 +38,17 @@ class VoiceChannel:
 
     async def transcribe(self, audio_bytes: bytes) -> str:
         return await asyncio.to_thread(self._transcribe, audio_bytes)
+
+    def _synthesize(self, text: str) -> bytes:
+        if not self.piper_model or shutil.which("piper") is None:
+            return text.encode("utf-8")
+        completed = subprocess.run(
+            ["piper", "--model", self.piper_model, "--output_file", "-"],
+            input=text.encode("utf-8"),
+            capture_output=True,
+            check=True,
+        )
+        return completed.stdout
+
+    async def synthesize(self, text: str) -> bytes:
+        return await asyncio.to_thread(self._synthesize, text)

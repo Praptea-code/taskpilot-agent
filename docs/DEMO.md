@@ -50,3 +50,20 @@ LLM_PROVIDER=fake python scripts/demo_sales.py
 ```
 
 Set `SMTP_CONSOLE=false` and point `SMTP_HOST` at Mailpit when you want to inspect messages in a local inbox instead of the console.
+
+## Optional voice
+
+Install the optional speech extras:
+
+```
+python -m pip install -e ".[voice]"
+```
+
+Download a free Piper voice from https://huggingface.co/rhasspy/piper-voices and set the model path:
+
+```
+PIPER_MODEL=/path/to/en_US-lessac-medium.onnx
+WHISPER_MODEL=base.en
+```
+
+When Piper is not configured, text to speech returns the reply text bytes instead of audio.
