@@ -24,3 +24,4 @@
 - Commit 41: inbound messages route to an awaiting session when one exists, otherwise they enter the existing goal planning service.
 - Commit 42: speech transcription is optional and lazy loaded so the default install never downloads a model.
 - Commit 43: text to speech returns reply text bytes when Piper is not configured, so the API can still answer without audio.
+- Commit 44: the voice endpoint reuses the inbound pipeline and reports whether TTS returned audio or plain text bytes.

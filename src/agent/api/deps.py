@@ -1,5 +1,6 @@
 from fastapi import Header, HTTPException
 
+from agent.channels.voice_channel import VoiceChannel
 from agent.core.clock import Clock, SystemClock
 from agent.executors.registry import ExecutorRegistry, build_default_registry
 from agent.llm.base import LLMClient
@@ -25,3 +26,7 @@ def get_llm_client() -> LLMClient:
 
 def get_registry() -> ExecutorRegistry:
     return build_default_registry()
+
+
+def get_voice_channel() -> VoiceChannel:
+    return VoiceChannel()
