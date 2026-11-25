@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from agent import __version__
 from agent.api.actions import router as actions_router
@@ -37,6 +38,12 @@ def create_app() -> FastAPI:
             monitor.stop()
 
     app = FastAPI(title="taskpilot-agent", version=settings.version, lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:5173"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.state.monitor = monitor
     app.include_router(goals_router)
     app.include_router(inbound_router)

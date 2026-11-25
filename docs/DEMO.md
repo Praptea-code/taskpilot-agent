@@ -67,3 +67,15 @@ WHISPER_MODEL=base.en
 ```
 
 When Piper is not configured, text to speech returns the reply text bytes instead of audio.
+
+## React client
+
+Install dependencies and start the dev server:
+
+```
+cd web
+npm install
+npm run dev
+```
+
+The client runs at `http://localhost:5173` and proxies API calls to FastAPI on port 8000. Start the API with `make dev` in another terminal. Create a goal, send a chat message, refresh notifications, and press Mic to send a recorded audio clip to the voice endpoint.
