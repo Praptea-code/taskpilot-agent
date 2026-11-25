@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     ollama_host: str = "http://localhost:11434"
     timezone: str = "UTC"
+    whisper_model: str = "base.en"
     grace_minutes: int = 10
     smtp_host: str = "localhost"
     smtp_port: int = 1025

@@ -22,3 +22,4 @@
 - Commit 39: no-reply follow-ups use a handler registered by domain and action type, with a three-touch escalation threshold.
 - Commit 40: the sales demo uses a frozen clock so canned deadlines, simulated replies, and monitor completion are deterministic offline.
 - Commit 41: inbound messages route to an awaiting session when one exists, otherwise they enter the existing goal planning service.
+- Commit 42: speech transcription is optional and lazy loaded so the default install never downloads a model.
