@@ -26,3 +26,4 @@
 - Commit 43: text to speech returns reply text bytes when Piper is not configured, so the API can still answer without audio.
 - Commit 44: the voice endpoint reuses the inbound pipeline and reports whether TTS returned audio or plain text bytes.
 - Commit 45: the React client uses the Vite dev proxy so the browser never needs a hard-coded API host.
+- Commit 46: API key checking is a middleware so every route is covered without per-endpoint dependencies.

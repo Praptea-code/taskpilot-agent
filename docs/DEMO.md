@@ -79,3 +79,5 @@ npm run dev
 ```
 
 The client runs at `http://localhost:5173` and proxies API calls to FastAPI on port 8000. Start the API with `make dev` in another terminal. Create a goal, send a chat message, refresh notifications, and press Mic to send a recorded audio clip to the voice endpoint.
+
+When `API_KEY` is set on the server, enter the same value in the client. It is sent as `X-API-Key` on every request.
