@@ -1,0 +1,57 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://taskpilot:taskpilot@postgres:5432/taskpilot
+      LLM_PROVIDER: ollama
+      OLLAMA_HOST: http://ollama:11434
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_CONSOLE: false
+      DEV_MODE: false
+      CREDENTIALS_KEY: ${CREDENTIALS_KEY:-dev-only-key-change-me}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+      ollama:
+        condition: service_started
+    command: >-
+      sh -c "python -m alembic upgrade head &&
+      python -m uvicorn agent.main:app --host 0.0.0.0 --port 8000"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: taskpilot
+      POSTGRES_PASSWORD: taskpilot
+      POSTGRES_DB: taskpilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskpilot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+volumes:
+  postgres-data:
+  ollama-data:

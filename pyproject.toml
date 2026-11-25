@@ -24,6 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 voice = ["faster-whisper"]
+postgres = ["asyncpg"]
 dev = [
     "pytest",
     "pytest-asyncio",

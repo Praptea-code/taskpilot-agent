@@ -87,3 +87,9 @@ WantedBy=multi-user.target
 ## Docker notes
 
 Build an image from the project root and run one container. Mount a volume for SQLite or use Postgres. Pass configuration with environment variables or an env file. Do not bake `.env`, API keys, or database files into the image.
+
+The repository also includes `docker-compose.yml` with Postgres, Mailpit, and Ollama services. Run `docker compose config` to validate it and `docker compose up --build` to start the stack. Set `CREDENTIALS_KEY` before starting the API service.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs Ruff and pytest on Python 3.11 and 3.12, builds the web client on Node 20, validates compose syntax, and runs migrations plus a test subset against Postgres. `.pre-commit-config.yaml` runs Ruff before each commit.
