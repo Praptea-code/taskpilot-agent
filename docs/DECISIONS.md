@@ -9,3 +9,4 @@
 - Commit 25: an invalid proposed time is asked for once, then replaced by the greedy scheduler's first available slot if it is still invalid.
 - Commit 27: renegotiation messages are sent through `TextChannel`, and an `ask_user` decision opens an `agent_sessions` row in `awaiting_reply`.
 - Commit 28: session turns are stored in `AgentSession.context` under `turns`, trimmed to the latest 10 entries after each reply.
+- Commit 29: escalation policy overrides merge into defaults by level number, so a partial level override keeps the default channel and contact list.
