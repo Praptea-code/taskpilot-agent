@@ -8,6 +8,7 @@ from agent.api.actions import router as actions_router
 from agent.api.checkins import router as checkins_router
 from agent.api.goals import router as goals_router
 from agent.api.notifications import router as notifications_router
+from agent.api.sessions import router as sessions_router
 from agent.config import get_settings
 from agent.core.clock import SystemClock
 from agent.core.monitor import Monitor, MonitorConfig
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(checkins_router)
     app.include_router(actions_router)
     app.include_router(notifications_router)
+    app.include_router(sessions_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

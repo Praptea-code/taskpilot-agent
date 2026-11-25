@@ -156,6 +156,61 @@ def fallback_time(
     return result.actions[0].scheduled_at if result.actions else None
 
 
+async def decide(
+    llm: LLMClient,
+    system: str,
+    prompt: str,
+    context: RenegotiationContext,
+    task: Task,
+    user: User,
+    goal: Goal,
+) -> tuple[RenegotiationDecision, datetime | None]:
+    decision = await structured(llm, RenegotiationDecision, system, prompt)
+    chosen = validate_proposed_time(decision, context, task.estimated_effort_minutes)
+
+    if chosen is None and decision.action == "reschedule":
+        retry_text = (
+            f"{prompt}\n\nThe previous new_time was invalid. "
+            "Choose a time inside a listed free slot and before the deadline."
+        )
+        decision = await structured(llm, RenegotiationDecision, system, retry_text)
+        chosen = validate_proposed_time(decision, context, task.estimated_effort_minutes)
+
+    if chosen is None and decision.action == "reschedule":
+        chosen = fallback_time(context, task, user, goal)
+        if chosen is not None:
+            decision = decision.model_copy(
+                update={"new_time": chosen.isoformat(), "reason": "Fallback slot selected"}
+            )
+    return decision, chosen
+
+
+async def apply_decision(
+    session: AsyncSession,
+    action: ScheduledAction,
+    registry: ExecutorRegistry,
+    decision: RenegotiationDecision,
+    chosen: datetime | None,
+) -> None:
+    task = await session.get(Task, action.task_id)
+    if task is None:
+        raise ValueError("Scheduled action has no task")
+    executor = registry.get(task.action_type)
+
+    if decision.action == "reschedule" and chosen is not None:
+        await executor.reschedule(action, chosen, session)
+        action.scheduled_at = chosen
+        action.status = ActionStatus.SCHEDULED
+        task.status = TaskStatus.SCHEDULED
+        action.attempt_number += 1
+    elif decision.action == "cancel":
+        await executor.cancel(action, session)
+        action.status = ActionStatus.CANCELLED
+        task.status = TaskStatus.CANCELLED
+    elif decision.action == "ask_user":
+        action.status = ActionStatus.IN_PROGRESS
+
+
 async def renegotiate(
     session: AsyncSession,
     action: ScheduledAction,
@@ -173,37 +228,38 @@ async def renegotiate(
 
     context = await build_context(session, action, user, clock, registry)
     system = with_context(RENEGOTIATE_SYSTEM, clock.now(), user.timezone)
-    decision = await structured(llm, RenegotiationDecision, system, context.text)
-    chosen = validate_proposed_time(decision, context, task.estimated_effort_minutes)
-
-    if chosen is None and decision.action == "reschedule":
-        retry_text = (
-            f"{context.text}\n\nThe previous new_time was invalid. "
-            "Choose a time inside a listed free slot and before the deadline."
-        )
-        decision = await structured(llm, RenegotiationDecision, system, retry_text)
-        chosen = validate_proposed_time(decision, context, task.estimated_effort_minutes)
-
-    if chosen is None and decision.action == "reschedule":
-        chosen = fallback_time(context, task, user, goal)
-        if chosen is not None:
-            decision = decision.model_copy(
-                update={"new_time": chosen.isoformat(), "reason": "Fallback slot selected"}
-            )
-
-    executor = registry.get(task.action_type)
-    if decision.action == "reschedule" and chosen is not None:
-        await executor.reschedule(action, chosen, session)
-        action.scheduled_at = chosen
-        action.status = ActionStatus.SCHEDULED
-        task.status = TaskStatus.SCHEDULED
-        action.attempt_number += 1
-    elif decision.action == "cancel":
-        await executor.cancel(action, session)
-        action.status = ActionStatus.CANCELLED
-        task.status = TaskStatus.CANCELLED
-    elif decision.action == "ask_user":
-        action.status = ActionStatus.IN_PROGRESS
-
+    decision, chosen = await decide(llm, system, context.text, context, task, user, goal)
+    await apply_decision(session, action, registry, decision, chosen)
     await session.commit()
+    return RenegotiationResult(decision=decision, applied_time=chosen)
+
+
+async def renegotiate_from_reply(
+    session: AsyncSession,
+    action: ScheduledAction,
+    user: User,
+    clock: Clock,
+    registry: ExecutorRegistry,
+    llm: LLMClient,
+    reply_text: str,
+    history: list[dict[str, str]],
+) -> RenegotiationResult:
+    task = await session.get(Task, action.task_id)
+    if task is None:
+        raise ValueError("Scheduled action has no task")
+    goal = await session.get(Goal, task.goal_id)
+    if goal is None:
+        raise ValueError("Task has no goal")
+
+    context = await build_context(session, action, user, clock, registry)
+    system = with_context(RENEGOTIATE_SYSTEM, clock.now(), user.timezone)
+    history_text = "\n".join(
+        f"{turn['role']}: {turn['text']}" for turn in history
+    )
+    prompt = (
+        f"{context.text}\n\nRecent turns:\n{history_text or 'none'}\n"
+        f"User reply: {reply_text}"
+    )
+    decision, chosen = await decide(llm, system, prompt, context, task, user, goal)
+    await apply_decision(session, action, registry, decision, chosen)
     return RenegotiationResult(decision=decision, applied_time=chosen)
