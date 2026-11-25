@@ -6,3 +6,4 @@
 - Commit 22: an unknown completion result sets the action to `in_progress` after creating a check-in notification, so later ticks wait for the user reply.
 - Commit 23: a rescheduled check-in applies an ISO `new_time` directly when present, otherwise it leaves the action waiting in `in_progress`.
 - Commit 24: miss history in the renegotiation context comes from `Task.miss_count` for every task in the goal.
+- Commit 25: an invalid proposed time is asked for once, then replaced by the greedy scheduler's first available slot if it is still invalid.
