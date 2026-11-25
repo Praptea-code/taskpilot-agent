@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 120
     credentials_key: str = ""
     grace_minutes: int = 10
+    monitor_lock_minutes: int = 15
     smtp_host: str = "localhost"
     smtp_port: int = 1025
     smtp_user: str | None = None

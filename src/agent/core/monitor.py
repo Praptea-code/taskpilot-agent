@@ -1,9 +1,11 @@
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agent.channels.email_channel import EmailChannel
@@ -32,11 +34,14 @@ from agent.models import (
 )
 from agent.schemas.escalation import EscalationPolicy
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class MonitorConfig:
     grace_minutes: int = 10
     interval_seconds: int = 30
+    lock_minutes: int = 15
 
 
 def sync_database_url(url: str) -> str:
@@ -73,9 +78,26 @@ class Monitor:
         self.email_channel = email_channel or EmailChannel()
         self.scheduler = AsyncIOScheduler()
 
+    async def recover_overdue(self) -> None:
+        stale_before = self.clock.now() - timedelta(minutes=self.config.lock_minutes)
+        async with self.maker() as session:
+            await session.execute(
+                update(ScheduledAction)
+                .where(
+                    ScheduledAction.processing_at.is_not(None),
+                    ScheduledAction.processing_at <= stale_before,
+                )
+                .values(processing_at=None)
+            )
+            await session.commit()
+
     async def start(self, jobstore_url: str) -> None:
         if self.scheduler.running:
             return
+        try:
+            await self.recover_overdue()
+        except OperationalError:
+            logger.warning("monitor_recovery_skipped", extra={"reason": "schema not ready"})
         jobstore = SQLAlchemyJobStore(url=sync_database_url(jobstore_url))
         self.scheduler.configure(jobstores={"default": jobstore})
         self.scheduler.add_job(
@@ -92,20 +114,36 @@ class Monitor:
             self.scheduler.shutdown(wait=False)
 
     async def tick(self) -> list[ScheduledAction]:
-        cutoff = self.clock.now() - timedelta(minutes=self.config.grace_minutes)
+        now = self.clock.now()
+        cutoff = now - timedelta(minutes=self.config.grace_minutes)
+        await self.recover_overdue()
+        claimed: list[ScheduledAction] = []
         async with self.maker() as session:
             result = await session.execute(
                 select(ScheduledAction)
                 .where(
                     ScheduledAction.status == ActionStatus.SCHEDULED,
                     ScheduledAction.scheduled_at <= cutoff,
+                    ScheduledAction.processing_at.is_(None),
                 )
                 .order_by(ScheduledAction.id)
             )
-            due = list(result.scalars().all())
-            for action in due:
+            for action in result.scalars().all():
+                claim = await session.execute(
+                    update(ScheduledAction)
+                    .where(
+                        ScheduledAction.id == action.id,
+                        ScheduledAction.processing_at.is_(None),
+                        ScheduledAction.attempt_number == action.attempt_number,
+                    )
+                    .values(processing_at=now)
+                )
+                if claim.rowcount == 1:
+                    claimed.append(action)
+            await session.commit()
+            for action in claimed:
                 await self.process(session, action)
-            return due
+            return claimed
 
     async def _record_escalation(
         self,
@@ -141,6 +179,8 @@ class Monitor:
     async def process(self, session: AsyncSession, action: ScheduledAction) -> None:
         task = await session.get(Task, action.task_id)
         if task is None:
+            action.processing_at = None
+            await session.commit()
             return
         executor = self.registry.get(task.action_type)
         status = await executor.check_completion(action, session)
@@ -155,6 +195,7 @@ class Monitor:
             task.miss_count += 1
             user = await session.get(User, action.user_id)
             if user is None:
+                action.processing_at = None
                 await session.commit()
                 return
 
@@ -219,4 +260,13 @@ class Monitor:
                     level="info",
                 )
             )
+        action.processing_at = None
+        logger.info(
+            "monitor_action_processed",
+            extra={
+                "user_id": action.user_id,
+                "goal_id": task.goal_id,
+                "action_id": action.id,
+            },
+        )
         await session.commit()

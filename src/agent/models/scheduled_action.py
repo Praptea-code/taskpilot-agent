@@ -25,5 +25,8 @@ class ScheduledAction(Base):
     executor_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     external_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     attempt_number: Mapped[int] = mapped_column(Integer, default=1)
+    processing_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     task: Mapped["Task"] = relationship(back_populates="scheduled_actions")

@@ -28,4 +28,4 @@
 - Commit 45: the React client uses the Vite dev proxy so the browser never needs a hard-coded API host.
 - Commit 46: user API keys are returned once and stored as salted hashes, with X-User-Id allowed only while DEV_MODE is true.
 - Commit 47: rate limiting is per process and per client, while credentials use Fernet encryption with the key supplied only through configuration.
-- Commit 48: the offline demo target pins the fake provider and a local SQLite file so the smoke run is deterministic.
+- Commit 48: monitor claims use processing_at plus attempt_number, and stale claims are cleared on startup so overdue actions run exactly once.

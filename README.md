@@ -103,6 +103,7 @@ Set `LLM_PROVIDER=fake` for deterministic offline tests and demos.
 | `PIPER_MODEL` | empty | Piper ONNX model path |
 | `DEV_MODE` | `true` | Allows `X-User-Id` for local tests only |
 | `RATE_LIMIT_PER_MINUTE` | `120` | Sliding-window request limit per client |
+| `MONITOR_LOCK_MINUTES` | `15` | Age before a stale monitor claim is recovered |
 | `CREDENTIALS_KEY` | empty | Fernet key for encrypted per-user credentials |
 
 Copy `.env.example` to `.env` and edit only the values you need.

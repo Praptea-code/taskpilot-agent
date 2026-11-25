@@ -50,7 +50,9 @@ Back up the database before upgrades. For SQLite, copy the database file while t
 
 Use `GET /health` for liveness. It returns the application version and does not require a user API key.
 
-Monitor logs for failed check-ins, escalation level changes, and notification delivery errors. The scheduler writes `ScheduledAction` rows, so a stalled process can also be detected by querying for actions with a `scheduled_at` far in the past.
+Logs are JSON lines with `user_id`, `goal_id`, `action_id`, and `path` when available. Unhandled exceptions return a generic 500 response and log the full exception.
+
+Monitor logs for failed check-ins, escalation level changes, and notification delivery errors. Each tick claims actions with `processing_at`, so two ticks cannot reschedule the same action twice. Claims older than `MONITOR_LOCK_MINUTES` are cleared on startup.
 
 ## Web client
 
