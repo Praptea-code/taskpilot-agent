@@ -1,12 +1,14 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from agent import __version__
 from agent.api.actions import router as actions_router
 from agent.api.checkins import router as checkins_router
+from agent.api.credentials import router as credentials_router
 from agent.api.goals import router as goals_router
 from agent.api.inbound import router as inbound_router
 from agent.api.notifications import router as notifications_router
@@ -16,6 +18,7 @@ from agent.api.voice import router as voice_router
 from agent.config import get_settings
 from agent.core.clock import SystemClock
 from agent.core.monitor import Monitor, MonitorConfig
+from agent.core.rate_limit import RateLimiter
 from agent.db.session import get_sessionmaker
 from agent.executors.registry import build_default_registry
 
@@ -39,6 +42,16 @@ def create_app() -> FastAPI:
             monitor.stop()
 
     app = FastAPI(title="taskpilot-agent", version=settings.version, lifespan=lifespan)
+    limiter = RateLimiter(settings.rate_limit_per_minute)
+
+    @app.middleware("http")
+    async def rate_limit(request: Request, call_next):
+        if settings.rate_limit_per_minute > 0:
+            key = request.client.host if request.client else "unknown"
+            if not limiter.allow(key):
+                return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded"})
+        return await call_next(request)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173"],
@@ -48,6 +61,7 @@ def create_app() -> FastAPI:
     app.state.monitor = monitor
 
     app.include_router(users_router)
+    app.include_router(credentials_router)
     app.include_router(goals_router)
     app.include_router(inbound_router)
     app.include_router(checkins_router)

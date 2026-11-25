@@ -102,6 +102,8 @@ Set `LLM_PROVIDER=fake` for deterministic offline tests and demos.
 | `WHISPER_MODEL` | `base.en` | faster-whisper model name |
 | `PIPER_MODEL` | empty | Piper ONNX model path |
 | `DEV_MODE` | `true` | Allows `X-User-Id` for local tests only |
+| `RATE_LIMIT_PER_MINUTE` | `120` | Sliding-window request limit per client |
+| `CREDENTIALS_KEY` | empty | Fernet key for encrypted per-user credentials |
 
 Copy `.env.example` to `.env` and edit only the values you need.
 

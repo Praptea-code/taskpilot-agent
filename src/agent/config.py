@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     timezone: str = "UTC"
     whisper_model: str = "base.en"
     piper_model: str = ""
+    rate_limit_per_minute: int = 120
+    credentials_key: str = ""
     grace_minutes: int = 10
     smtp_host: str = "localhost"
     smtp_port: int = 1025

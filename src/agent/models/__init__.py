@@ -11,6 +11,7 @@ from agent.models.notification import Notification
 from agent.models.scheduled_action import ScheduledAction
 from agent.models.task import Task
 from agent.models.user import User
+from agent.models.user_credential import UserCredential
 
 __all__ = [
     "ActionStatus",
@@ -29,4 +30,5 @@ __all__ = [
     "TaskStatus",
     "TimestampMixin",
     "User",
+    "UserCredential",
 ]

@@ -20,6 +20,12 @@ Set `DEV_MODE=false` in production so only bearer API keys are accepted. Create 
 
 For hosted free LLM tiers, set `LLM_PROVIDER=openai_compat` plus `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`. For local inference, keep `LLM_PROVIDER=ollama` and point `OLLAMA_HOST` at the Ollama service.
 
+Tune `RATE_LIMIT_PER_MINUTE` for the reverse proxy and expected client count. The limiter is in memory, so it resets on restart and is per process.
+
+Generate a Fernet key with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` and set it as `CREDENTIALS_KEY`. POST secrets to `/users/me/credentials`; the API stores ciphertext and never returns secret values.
+
+`GoogleCalendarExecutor` is a stub that satisfies the executor interface. To enable it later, register a Google OAuth client, store the resulting token as a credential with service `google_calendar`, implement the API calls in that class, and keep the OAuth consent screen in testing mode for free usage.
+
 Set `SMTP_CONSOLE=false` to send real email. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_SENDER`. Replies are read from the local `inbox_messages` table, so an external mail integration should insert into that table.
 
 Voice requires `python -m pip install -e ".[voice]"` and a Piper voice file. Set `WHISPER_MODEL` and `PIPER_MODEL`. Without Piper, voice replies contain plain text bytes.
