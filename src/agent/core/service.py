@@ -32,20 +32,29 @@ class GoalService:
         raw_text: str,
         domain: str,
         llm: LLMClient | None = None,
+        goal: Goal | None = None,
     ) -> PlanOutcome:
         engine = llm or get_llm()
         extraction = await extract_goal(raw_text, user, self.clock, engine)
-        goal = Goal(
-            user_id=user.id,
-            raw_input_text=raw_text,
-            extracted_goal=extraction.title,
-            deadline=extraction.deadline,
-            constraints=extraction.constraints,
-            status=GoalStatus.PENDING,
-            domain=domain,
-        )
-        self.session.add(goal)
-        await self.session.flush()
+        if goal is None:
+            goal = Goal(
+                user_id=user.id,
+                raw_input_text=raw_text,
+                extracted_goal=extraction.title,
+                deadline=extraction.deadline,
+                constraints=extraction.constraints,
+                status=GoalStatus.PENDING,
+                domain=domain,
+            )
+            self.session.add(goal)
+            await self.session.flush()
+        else:
+            goal.raw_input_text = raw_text
+            goal.extracted_goal = extraction.title
+            goal.deadline = extraction.deadline
+            goal.constraints = extraction.constraints
+            goal.domain = domain
+            goal.status = GoalStatus.PENDING
 
         if extraction.clarifying_question:
             goal.status = GoalStatus.NEEDS_INFO
