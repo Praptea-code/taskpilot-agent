@@ -9,14 +9,17 @@ from agent.config import get_settings
 from agent.core.clock import SystemClock
 from agent.core.monitor import Monitor, MonitorConfig
 from agent.db.session import get_sessionmaker
+from agent.executors.registry import build_default_registry
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    maker = get_sessionmaker(settings.database_url)
     monitor = Monitor(
-        get_sessionmaker(settings.database_url),
+        maker,
         SystemClock(),
         MonitorConfig(grace_minutes=settings.grace_minutes),
+        build_default_registry(maker),
     )
 
     @asynccontextmanager

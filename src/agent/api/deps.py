@@ -1,8 +1,7 @@
 from fastapi import Header, HTTPException
 
 from agent.core.clock import Clock, SystemClock
-from agent.executors.local_calendar import LocalCalendarExecutor
-from agent.executors.registry import ExecutorRegistry
+from agent.executors.registry import ExecutorRegistry, build_default_registry
 from agent.llm.base import LLMClient
 from agent.llm.factory import get_llm
 
@@ -25,8 +24,4 @@ def get_llm_client() -> LLMClient:
 
 
 def get_registry() -> ExecutorRegistry:
-    registry = ExecutorRegistry()
-    executor = LocalCalendarExecutor()
-    for action_type in ("focus", "general", "calendar"):
-        registry.register(action_type, executor)
-    return registry
+    return build_default_registry()

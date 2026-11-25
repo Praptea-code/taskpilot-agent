@@ -9,7 +9,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from agent.config import get_settings
 from agent.core.clock import Clock, SystemClock
 from agent.db.session import get_sessionmaker
-from agent.models import ActionStatus, ScheduledAction
+from agent.executors.base import CompletionStatus
+from agent.executors.registry import ExecutorRegistry, build_default_registry
+from agent.models import (
+    ActionStatus,
+    Goal,
+    GoalStatus,
+    Notification,
+    ScheduledAction,
+    Task,
+    TaskStatus,
+)
 
 
 @dataclass(frozen=True)
@@ -24,10 +34,12 @@ def sync_database_url(url: str) -> str:
 
 async def scheduled_tick() -> None:
     settings = get_settings()
+    maker = get_sessionmaker(settings.database_url)
     monitor = Monitor(
-        get_sessionmaker(settings.database_url),
+        maker,
         SystemClock(),
         MonitorConfig(grace_minutes=settings.grace_minutes),
+        build_default_registry(maker),
     )
     await monitor.tick()
 
@@ -38,10 +50,12 @@ class Monitor:
         maker: async_sessionmaker[AsyncSession],
         clock: Clock | None = None,
         config: MonitorConfig | None = None,
+        registry: ExecutorRegistry | None = None,
     ) -> None:
         self.maker = maker
         self.clock = clock or SystemClock()
         self.config = config or MonitorConfig()
+        self.registry = registry or ExecutorRegistry()
         self.scheduler = AsyncIOScheduler()
 
     async def start(self, jobstore_url: str) -> None:
@@ -73,4 +87,43 @@ class Monitor:
                 )
                 .order_by(ScheduledAction.id)
             )
-            return list(result.scalars().all())
+            due = list(result.scalars().all())
+            for action in due:
+                await self.process(session, action)
+            return due
+
+    async def process(self, session: AsyncSession, action: ScheduledAction) -> None:
+        task = await session.get(Task, action.task_id)
+        if task is None:
+            return
+        executor = self.registry.get(task.action_type)
+        status = await executor.check_completion(action, session)
+
+        if status == CompletionStatus.DONE:
+            action.status = ActionStatus.DONE
+            task.status = TaskStatus.DONE
+            await self.finish_goal(session, task.goal_id)
+        elif status == CompletionStatus.NOT_DONE:
+            action.status = ActionStatus.MISSED
+            task.status = TaskStatus.MISSED
+            task.miss_count += 1
+        elif status == CompletionStatus.UNKNOWN:
+            action.status = ActionStatus.IN_PROGRESS
+            session.add(
+                Notification(
+                    user_id=action.user_id,
+                    channel="text",
+                    title="Check-in",
+                    body=f"Did you complete: {task.description}?",
+                    level="info",
+                )
+            )
+        await session.commit()
+
+    async def finish_goal(self, session: AsyncSession, goal_id: int) -> None:
+        result = await session.execute(select(Task).where(Task.goal_id == goal_id))
+        tasks = list(result.scalars().all())
+        if tasks and all(task.status == TaskStatus.DONE for task in tasks):
+            goal = await session.get(Goal, goal_id)
+            if goal is not None:
+                goal.status = GoalStatus.DONE

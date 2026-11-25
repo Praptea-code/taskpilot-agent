@@ -1,5 +1,7 @@
 from collections.abc import Iterator
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from agent.executors.base import ActionExecutor
 
 
@@ -24,3 +26,15 @@ _registry = ExecutorRegistry()
 
 def get_registry() -> ExecutorRegistry:
     return _registry
+
+
+def build_default_registry(
+    maker: async_sessionmaker[AsyncSession] | None = None,
+) -> ExecutorRegistry:
+    from agent.executors.local_calendar import LocalCalendarExecutor
+
+    registry = ExecutorRegistry()
+    executor = LocalCalendarExecutor(maker)
+    for action_type in ("focus", "general", "calendar"):
+        registry.register(action_type, executor)
+    return registry
