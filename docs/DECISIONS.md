@@ -14,3 +14,4 @@
 - Commit 31: escalation messages fall back to a tone-prefixed template when the LLM is unavailable, so notifications never depend on model uptime.
 - Commit 32: email delivery defaults to a console backend, and SMTP settings are only used when `SMTP_CONSOLE=false`.
 - Commit 33: the escalation scenario advances the clock between misses and reuses one scheduled action across every step.
+- Commit 34: `send_email` tasks store `lead_id`, `template`, and `step` in `Task.payload`, validated by `SendEmailPayload`.

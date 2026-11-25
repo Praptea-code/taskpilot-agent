@@ -5,6 +5,7 @@ from agent.models.check_in import CheckIn
 from agent.models.enums import ActionStatus, GoalStatus, TaskStatus
 from agent.models.escalation_event import EscalationEvent
 from agent.models.goal import Goal
+from agent.models.lead import Lead
 from agent.models.notification import Notification
 from agent.models.scheduled_action import ScheduledAction
 from agent.models.task import Task
@@ -19,6 +20,7 @@ __all__ = [
     "EscalationEvent",
     "Goal",
     "GoalStatus",
+    "Lead",
     "Notification",
     "ScheduledAction",
     "Task",
