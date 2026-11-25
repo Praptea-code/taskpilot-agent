@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from agent.channels.text_channel import TextChannel
 from agent.config import get_settings
 from agent.core.clock import Clock, SystemClock
+from agent.core.escalation import escalation_policy_for, evaluate
 from agent.core.renegotiator import renegotiate
 from agent.core.state import finish_goal_if_done
 from agent.db.session import get_sessionmaker
@@ -19,6 +20,7 @@ from agent.llm.factory import get_llm
 from agent.models import (
     ActionStatus,
     AgentSession,
+    EscalationEvent,
     Notification,
     ScheduledAction,
     Task,
@@ -118,6 +120,18 @@ class Monitor:
             if user is None:
                 await session.commit()
                 return
+            escalation = evaluate(task, escalation_policy_for(user))
+            if escalation is not None:
+                session.add(
+                    EscalationEvent(
+                        user_id=user.id,
+                        goal_id=task.goal_id,
+                        reason=escalation.reason,
+                        level=escalation.level,
+                        channel=escalation.channel,
+                        occurred_at=self.clock.now(),
+                    )
+                )
             result = await renegotiate(
                 session, action, user, self.clock, self.registry, self.llm
             )

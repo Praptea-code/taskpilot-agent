@@ -24,3 +24,11 @@ class EscalationPolicy(BaseModel):
 
 
 DEFAULT_ESCALATION_POLICY = EscalationPolicy()
+
+
+class EscalationDecision(BaseModel):
+    level: int = Field(ge=1)
+    channel: Literal["text", "email"]
+    tone: Literal["neutral", "insistent", "urgent"]
+    notify_contacts: list[str] = Field(default_factory=list)
+    reason: str
