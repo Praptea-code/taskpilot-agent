@@ -3,6 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 PayloadBuilder = Callable[[int, str], dict[str, object]]
+Handler = Callable[..., object]
 
 
 @dataclass(frozen=True)
@@ -34,6 +35,8 @@ _HINTS = {
     )
 }
 
+_HANDLERS: dict[tuple[str, str], Handler] = {}
+
 
 def register_domain_hints(domain: str, hints: DomainHints) -> None:
     _HINTS[domain] = hints
@@ -50,3 +53,12 @@ def payload_for_action(
     if builder is None:
         return {"order": order}
     return builder(order, description)
+
+
+def handler_for(domain: str | None, action_type: str) -> Handler | None:
+    key = (domain or "", action_type)
+    if key not in _HANDLERS and key == ("sales", "send_email"):
+        from agent.executors.sales_followup import handle_no_reply
+
+        _HANDLERS[key] = handle_no_reply
+    return _HANDLERS.get(key)

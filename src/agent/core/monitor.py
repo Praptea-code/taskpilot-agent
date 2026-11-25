@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -11,10 +11,11 @@ from agent.channels.text_channel import TextChannel
 from agent.config import get_settings
 from agent.core.clock import Clock, SystemClock
 from agent.core.escalation import escalation_message, escalation_policy_for, evaluate
-from agent.core.renegotiator import renegotiate
+from agent.core.renegotiator import apply_decision, renegotiate
 from agent.core.state import finish_goal_if_done
 from agent.db.session import get_sessionmaker
 from agent.executors.base import CompletionStatus
+from agent.executors.domain_prompts import handler_for
 from agent.executors.registry import ExecutorRegistry, build_default_registry
 from agent.llm.base import LLMClient
 from agent.llm.factory import get_llm
@@ -22,12 +23,14 @@ from agent.models import (
     ActionStatus,
     AgentSession,
     EscalationEvent,
+    Goal,
     Notification,
     ScheduledAction,
     Task,
     TaskStatus,
     User,
 )
+from agent.schemas.escalation import EscalationPolicy
 
 
 @dataclass(frozen=True)
@@ -104,6 +107,37 @@ class Monitor:
                 await self.process(session, action)
             return due
 
+    async def _record_escalation(
+        self,
+        session: AsyncSession,
+        task: Task,
+        user: User,
+        policy: EscalationPolicy,
+    ) -> None:
+        escalation = evaluate(task, policy)
+        if escalation is None:
+            return
+        session.add(
+            EscalationEvent(
+                user_id=user.id,
+                goal_id=task.goal_id,
+                reason=escalation.reason,
+                level=escalation.level,
+                channel=escalation.channel,
+                occurred_at=self.clock.now(),
+            )
+        )
+        message = await escalation_message(task, escalation, user, self.clock, self.llm)
+        await TextChannel(session).send(user, message)
+        if escalation.level >= 2:
+            for contact in escalation.notify_contacts:
+                await self.email_channel.send(
+                    user,
+                    message,
+                    to=contact,
+                    subject=f"Escalation level {escalation.level}",
+                )
+
     async def process(self, session: AsyncSession, action: ScheduledAction) -> None:
         task = await session.get(Task, action.task_id)
         if task is None:
@@ -123,35 +157,45 @@ class Monitor:
             if user is None:
                 await session.commit()
                 return
-            escalation = evaluate(task, escalation_policy_for(user))
-            if escalation is not None:
-                session.add(
-                    EscalationEvent(
-                        user_id=user.id,
-                        goal_id=task.goal_id,
-                        reason=escalation.reason,
-                        level=escalation.level,
-                        channel=escalation.channel,
-                        occurred_at=self.clock.now(),
+
+            policy = escalation_policy_for(user)
+            goal = await session.get(Goal, task.goal_id)
+            handler = handler_for(goal.domain if goal is not None else None, task.action_type)
+            decision = None
+            if handler is not None:
+                outcome = await handler(
+                    session,
+                    action,
+                    task,
+                    user,
+                    self.clock,
+                    self.registry,
+                    self.llm,
+                    self.email_channel,
+                )
+                if outcome is not None:
+                    decision = outcome.decision
+                    apply_time = (
+                        datetime.fromisoformat(decision.new_time)
+                        if decision.new_time
+                        else None
                     )
+                    await apply_decision(session, action, self.registry, decision, apply_time)
+                    policy = policy.model_copy(
+                        update={"misses_before_escalate": outcome.escalation_threshold}
+                    )
+
+            if decision is None:
+                await self._record_escalation(session, task, user, policy)
+                result = await renegotiate(
+                    session, action, user, self.clock, self.registry, self.llm
                 )
-                message = await escalation_message(
-                    task, escalation, user, self.clock, self.llm
-                )
-                await TextChannel(session).send(user, message)
-                if escalation.level >= 2:
-                    for contact in escalation.notify_contacts:
-                        await self.email_channel.send(
-                            user,
-                            message,
-                            to=contact,
-                            subject=f"Escalation level {escalation.level}",
-                        )
-            result = await renegotiate(
-                session, action, user, self.clock, self.registry, self.llm
-            )
-            await TextChannel(session).send(user, result.decision.message_to_user)
-            if result.decision.action == "ask_user":
+                decision = result.decision
+            else:
+                await self._record_escalation(session, task, user, policy)
+
+            await TextChannel(session).send(user, decision.message_to_user)
+            if decision.action == "ask_user":
                 session.add(
                     AgentSession(
                         user_id=user.id,
@@ -159,8 +203,8 @@ class Monitor:
                         scheduled_action_id=action.id,
                         status="awaiting_reply",
                         context={
-                            "reason": result.decision.reason,
-                            "message": result.decision.message_to_user,
+                            "reason": decision.reason,
+                            "message": decision.message_to_user,
                         },
                     )
                 )

@@ -36,6 +36,11 @@ ESCALATION_SYSTEM = (
     "Return only the message text."
 )
 
+FOLLOWUP_SYSTEM = (
+    "You write a short follow-up message. "
+    "Return only the message text."
+)
+
 
 def with_context(template: str, now: datetime, user_timezone: str) -> str:
     return (
