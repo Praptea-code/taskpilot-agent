@@ -16,3 +16,4 @@
 - Commit 33: the escalation scenario advances the clock between misses and reuses one scheduled action across every step.
 - Commit 34: `send_email` tasks store `lead_id`, `template`, and `step` in `Task.payload`, validated by `SendEmailPayload`.
 - Commit 35: reply checks use a local `inbox_messages` table, with a three-day minimum gap and weekday-only availability for follow-ups.
+- Commit 36: CRM updates are stage transitions stored in `Task.payload`, and completion means the lead already reached the target stage.

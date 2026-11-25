@@ -32,6 +32,7 @@ def build_default_registry(
     maker: async_sessionmaker[AsyncSession] | None = None,
 ) -> ExecutorRegistry:
     from agent.channels.email_channel import EmailChannel
+    from agent.executors.crm_executor import CRMExecutor
     from agent.executors.email_executor import EmailExecutor
     from agent.executors.local_calendar import LocalCalendarExecutor
 
@@ -40,4 +41,5 @@ def build_default_registry(
     for action_type in ("focus", "general", "calendar"):
         registry.register(action_type, executor)
     registry.register("send_email", EmailExecutor(EmailChannel()))
+    registry.register("crm", CRMExecutor())
     return registry
