@@ -6,6 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agent.channels.email_channel import EmailChannel
 from agent.channels.text_channel import TextChannel
 from agent.config import get_settings
 from agent.core.clock import Clock, SystemClock
@@ -59,12 +60,14 @@ class Monitor:
         config: MonitorConfig | None = None,
         registry: ExecutorRegistry | None = None,
         llm: LLMClient | None = None,
+        email_channel: EmailChannel | None = None,
     ) -> None:
         self.maker = maker
         self.clock = clock or SystemClock()
         self.config = config or MonitorConfig()
         self.registry = registry or ExecutorRegistry()
         self.llm = llm or get_llm()
+        self.email_channel = email_channel or EmailChannel()
         self.scheduler = AsyncIOScheduler()
 
     async def start(self, jobstore_url: str) -> None:
@@ -136,6 +139,14 @@ class Monitor:
                     task, escalation, user, self.clock, self.llm
                 )
                 await TextChannel(session).send(user, message)
+                if escalation.level >= 2:
+                    for contact in escalation.notify_contacts:
+                        await self.email_channel.send(
+                            user,
+                            message,
+                            to=contact,
+                            subject=f"Escalation level {escalation.level}",
+                        )
             result = await renegotiate(
                 session, action, user, self.clock, self.registry, self.llm
             )

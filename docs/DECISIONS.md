@@ -12,3 +12,4 @@
 - Commit 29: escalation policy overrides merge into defaults by level number, so a partial level override keeps the default channel and contact list.
 - Commit 30: escalation level advances one step per miss after the threshold and stops at the highest configured level.
 - Commit 31: escalation messages fall back to a tone-prefixed template when the LLM is unavailable, so notifications never depend on model uptime.
+- Commit 32: email delivery defaults to a console backend, and SMTP settings are only used when `SMTP_CONSOLE=false`.

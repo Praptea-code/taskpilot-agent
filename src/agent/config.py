@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     ollama_host: str = "http://localhost:11434"
     timezone: str = "UTC"
     grace_minutes: int = 10
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_sender: str = "agent@localhost"
+    smtp_console: bool = True
     dev_mode: bool = True
     version: str = "0.1.0"
 

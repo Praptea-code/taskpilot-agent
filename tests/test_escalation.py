@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from agent.channels.email_channel import EmailChannel
 from agent.core.clock import FrozenClock
 from agent.core.escalation import escalation_message, evaluate
 from agent.core.monitor import Monitor
@@ -186,4 +187,94 @@ async def test_monitor_writes_escalation_event(tmp_path) -> None:
         assert events[0].level == 1
         assert events[0].channel == "text"
         assert events[0].reason == "Missed 1 times"
+    await engine.dispose()
+
+
+async def test_email_channel_console_backend_captures_outbound() -> None:
+    sent: list[object] = []
+    channel = EmailChannel(console=True, sender="agent@example.com", sent=sent)
+    user = User(name="User", email="user@example.com")
+
+    await channel.send(user, "Please follow up", to="friend@example.com")
+
+    assert len(sent) == 1
+    email = sent[0]
+    assert email.recipient == "friend@example.com"
+    assert email.subject == "TaskPilot escalation"
+    assert email.body == "Please follow up"
+
+
+async def test_monitor_notifies_contacts_at_level_two(tmp_path) -> None:
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'contacts.db'}")
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+
+    async with maker() as session:
+        user = User(
+            name="User",
+            email="user@example.com",
+            escalation_policy={
+                "misses_before_escalate": 1,
+                "levels": [
+                    {
+                        "level": 2,
+                        "channel": "text",
+                        "tone": "urgent",
+                        "notify_contacts": ["friend@example.com"],
+                    }
+                ],
+            },
+        )
+        session.add(user)
+        await session.flush()
+        goal = Goal(user_id=user.id, raw_input_text="Goal", status="planned")
+        session.add(goal)
+        await session.flush()
+        task = Task(
+            user_id=user.id,
+            goal_id=goal.id,
+            description="Task",
+            action_type="focus",
+            estimated_effort_minutes=30,
+            miss_count=1,
+            status=TaskStatus.SCHEDULED,
+        )
+        session.add(task)
+        await session.flush()
+        session.add(
+            ScheduledAction(
+                user_id=user.id,
+                task_id=task.id,
+                scheduled_at=NOW - timedelta(minutes=11),
+                duration_minutes=30,
+                status=ActionStatus.SCHEDULED,
+            )
+        )
+        await session.commit()
+
+    registry = ExecutorRegistry()
+    registry.register("focus", MissExecutor())
+    sent: list[object] = []
+    monitor = Monitor(
+        maker,
+        FrozenClock(NOW),
+        registry=registry,
+        llm=FakeLLMClient(
+            [
+                "Urgent follow up",
+                '{"action": "keep_as_is", "new_time": null, "reason": "Wait", '
+                '"message_to_user": "Keeping the plan"}',
+            ]
+        ),
+        email_channel=EmailChannel(console=True, sent=sent),
+    )
+
+    await monitor.tick()
+
+    assert len(sent) == 1
+    email = sent[0]
+    assert email.recipient == "friend@example.com"
+    assert email.subject == "Escalation level 2"
+    assert email.body == "Urgent follow up"
     await engine.dispose()
