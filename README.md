@@ -102,6 +102,7 @@ Copy `.env.example` to `.env` and edit only the values you need.
 ```
 make check
 make demo-sales
+make demo-offline
 python -m alembic upgrade head
 ```
 
