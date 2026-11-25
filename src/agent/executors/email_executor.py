@@ -49,8 +49,11 @@ class EmailExecutor:
             if day.weekday() >= 5:
                 continue
             slot_start = datetime.combine(day.date(), time(hour=9), tzinfo=beginning.tzinfo)
-            slot_end = slot_start + timedelta(hours=1)
-            if slot_start < beginning or slot_end > finish:
+            working_end = datetime.combine(
+                day.date(), time(hour=21), tzinfo=beginning.tzinfo
+            )
+            slot_end = min(working_end, finish)
+            if slot_start < beginning or slot_end <= slot_start:
                 continue
             if last_contact is not None and slot_start - last_contact < timedelta(days=3):
                 continue

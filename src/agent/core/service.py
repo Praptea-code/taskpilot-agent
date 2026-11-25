@@ -7,6 +7,7 @@ from agent.core.clock import Clock
 from agent.core.decomposer import decompose_goal
 from agent.core.extractor import extract_goal
 from agent.core.scheduler import ScheduleResult, SchedulingRequest, schedule_tasks
+from agent.executors.domain_prompts import hints_for_domain, payload_for_action
 from agent.executors.registry import ExecutorRegistry
 from agent.llm.base import LLMClient
 from agent.llm.factory import get_llm
@@ -35,7 +36,8 @@ class GoalService:
         goal: Goal | None = None,
     ) -> PlanOutcome:
         engine = llm or get_llm()
-        extraction = await extract_goal(raw_text, user, self.clock, engine)
+        hints = hints_for_domain(domain)
+        extraction = await extract_goal(raw_text, user, self.clock, engine, hints.examples)
         if goal is None:
             goal = Goal(
                 user_id=user.id,
@@ -67,6 +69,7 @@ class GoalService:
             self.clock,
             engine,
             user.timezone,
+            hints.examples,
         )
         task_rows: list[Task] = []
         for item in decomposed:
@@ -77,7 +80,7 @@ class GoalService:
                 estimated_effort_minutes=item.estimated_effort_minutes,
                 action_type=item.action_type,
                 status=TaskStatus.PENDING,
-                payload={"order": item.order},
+                payload=payload_for_action(domain, item.action_type, item.order, item.description),
             )
             self.session.add(row)
             task_rows.append(row)

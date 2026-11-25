@@ -62,10 +62,13 @@ async def decompose_goal(
     clock: Clock,
     llm: LLMClient,
     user_timezone: str = "UTC",
+    examples: str = "",
 ) -> list[DecomposedTask]:
     maximum = constraints.get("max_session_minutes")
     max_minutes = maximum if isinstance(maximum, int) else None
     system = with_context(DECOMPOSE_GOAL_SYSTEM, clock.now(), user_timezone)
+    if examples:
+        system = f"{system}\n{examples}"
     user = f"Goal: {title}\nConstraints: {constraints}"
     extracted = await structured(llm, ExtractedTasks, system, user)
     ordered = sorted(extracted.tasks, key=lambda item: item.order)

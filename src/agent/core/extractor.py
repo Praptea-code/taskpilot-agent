@@ -68,8 +68,12 @@ def resolve_deadline(value: str | None, clock: Clock, user_timezone: str) -> dat
     return local_end.astimezone(UTC)
 
 
-async def extract_goal(raw: str, user: User, clock: Clock, llm: LLMClient) -> GoalExtraction:
+async def extract_goal(
+    raw: str, user: User, clock: Clock, llm: LLMClient, examples: str = ""
+) -> GoalExtraction:
     system = with_context(EXTRACT_GOAL_SYSTEM, clock.now(), user.timezone)
+    if examples:
+        system = f"{system}\n{examples}"
     extracted = await structured(llm, ExtractedGoal, system, raw)
     return GoalExtraction(
         title=extracted.title,
