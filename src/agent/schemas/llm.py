@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -25,3 +27,9 @@ class ExtractedTask(BaseModel):
 
 class ExtractedTasks(BaseModel):
     tasks: list[ExtractedTask]
+
+
+class CheckInDecision(BaseModel):
+    outcome: Literal["completed", "rescheduled", "cancelled", "unclear"]
+    new_time: str | None = None
+    message_to_user: str | None = None

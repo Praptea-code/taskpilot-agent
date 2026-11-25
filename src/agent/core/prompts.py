@@ -22,6 +22,7 @@ DECOMPOSE_GOAL_SYSTEM = (
 
 CLASSIFY_REPLY_SYSTEM = (
     "You classify a free text reply into one of the allowed outcomes. "
+    "Allowed outcomes are completed, rescheduled, cancelled, and unclear. "
     "Return only the requested JSON object."
 )
 

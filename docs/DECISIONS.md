@@ -4,3 +4,4 @@
 - Commit 20: fake demo mode supplies canned JSON responses because the environment-selected `FakeLLMClient` has no scripted queue by default.
 - Commit 21: the APScheduler job uses a module-level tick function because the `Monitor` instance holds an async engine that `SQLAlchemyJobStore` cannot pickle.
 - Commit 22: an unknown completion result sets the action to `in_progress` after creating a check-in notification, so later ticks wait for the user reply.
+- Commit 23: a rescheduled check-in applies an ISO `new_time` directly when present, otherwise it leaves the action waiting in `in_progress`.

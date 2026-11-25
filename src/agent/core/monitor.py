@@ -8,18 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agent.config import get_settings
 from agent.core.clock import Clock, SystemClock
+from agent.core.state import finish_goal_if_done
 from agent.db.session import get_sessionmaker
 from agent.executors.base import CompletionStatus
 from agent.executors.registry import ExecutorRegistry, build_default_registry
-from agent.models import (
-    ActionStatus,
-    Goal,
-    GoalStatus,
-    Notification,
-    ScheduledAction,
-    Task,
-    TaskStatus,
-)
+from agent.models import ActionStatus, Notification, ScheduledAction, Task, TaskStatus
 
 
 @dataclass(frozen=True)
@@ -102,7 +95,7 @@ class Monitor:
         if status == CompletionStatus.DONE:
             action.status = ActionStatus.DONE
             task.status = TaskStatus.DONE
-            await self.finish_goal(session, task.goal_id)
+            await finish_goal_if_done(session, task.goal_id)
         elif status == CompletionStatus.NOT_DONE:
             action.status = ActionStatus.MISSED
             task.status = TaskStatus.MISSED
@@ -119,11 +112,3 @@ class Monitor:
                 )
             )
         await session.commit()
-
-    async def finish_goal(self, session: AsyncSession, goal_id: int) -> None:
-        result = await session.execute(select(Task).where(Task.goal_id == goal_id))
-        tasks = list(result.scalars().all())
-        if tasks and all(task.status == TaskStatus.DONE for task in tasks):
-            goal = await session.get(Goal, goal_id)
-            if goal is not None:
-                goal.status = GoalStatus.DONE

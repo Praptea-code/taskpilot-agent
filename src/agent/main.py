@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from agent import __version__
+from agent.api.actions import router as actions_router
+from agent.api.checkins import router as checkins_router
 from agent.api.goals import router as goals_router
 from agent.config import get_settings
 from agent.core.clock import SystemClock
@@ -33,6 +35,8 @@ def create_app() -> FastAPI:
     app = FastAPI(title="taskpilot-agent", version=settings.version, lifespan=lifespan)
     app.state.monitor = monitor
     app.include_router(goals_router)
+    app.include_router(checkins_router)
+    app.include_router(actions_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
