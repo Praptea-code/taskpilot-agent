@@ -38,9 +38,14 @@ async def test_models_round_trip_with_relationships() -> None:
         )
         session.add(action)
         await session.commit()
+        action_id = action.id
 
-    query = select(ScheduledAction).options(
-        selectinload(ScheduledAction.task).selectinload(Task.goal).selectinload(Goal.user)
+    query = (
+        select(ScheduledAction)
+        .where(ScheduledAction.id == action_id)
+        .options(
+            selectinload(ScheduledAction.task).selectinload(Task.goal).selectinload(Goal.user)
+        )
     )
     async with maker() as session:
         loaded = (await session.execute(query)).scalar_one()
