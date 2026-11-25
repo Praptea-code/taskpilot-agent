@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
+from agent.core.prompts import ESCALATION_SYSTEM, with_context
+from agent.llm.base import LLMClient
 from agent.schemas.escalation import (
     DEFAULT_ESCALATION_POLICY,
     EscalationDecision,
@@ -7,6 +9,7 @@ from agent.schemas.escalation import (
 )
 
 if TYPE_CHECKING:
+    from agent.core.clock import Clock
     from agent.models.task import Task
     from agent.models.user import User
 
@@ -43,3 +46,34 @@ def evaluate(task: "Task", policy: EscalationPolicy) -> EscalationDecision | Non
         notify_contacts=list(level.notify_contacts),
         reason=f"Missed {task.miss_count} times",
     )
+
+
+def fallback_message(task: "Task", decision: EscalationDecision) -> str:
+    prefixes = {
+        "neutral": "Reminder:",
+        "insistent": "Please follow up:",
+        "urgent": "Urgent:",
+    }
+    return f"{prefixes[decision.tone]} {task.description} ({decision.reason})."
+
+
+async def escalation_message(
+    task: "Task",
+    decision: EscalationDecision,
+    user: "User",
+    clock: "Clock",
+    llm: LLMClient,
+) -> str:
+    system = with_context(ESCALATION_SYSTEM, clock.now(), user.timezone)
+    prompt = (
+        f"Task: {task.description}\n"
+        f"Tone: {decision.tone}\n"
+        f"Reason: {decision.reason}"
+    )
+    try:
+        message = (await llm.complete(system, prompt)).strip()
+        if not message:
+            raise ValueError("Empty escalation message")
+        return message
+    except Exception:
+        return fallback_message(task, decision)

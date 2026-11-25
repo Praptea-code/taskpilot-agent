@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from agent.channels.text_channel import TextChannel
 from agent.config import get_settings
 from agent.core.clock import Clock, SystemClock
-from agent.core.escalation import escalation_policy_for, evaluate
+from agent.core.escalation import escalation_message, escalation_policy_for, evaluate
 from agent.core.renegotiator import renegotiate
 from agent.core.state import finish_goal_if_done
 from agent.db.session import get_sessionmaker
@@ -132,6 +132,10 @@ class Monitor:
                         occurred_at=self.clock.now(),
                     )
                 )
+                message = await escalation_message(
+                    task, escalation, user, self.clock, self.llm
+                )
+                await TextChannel(session).send(user, message)
             result = await renegotiate(
                 session, action, user, self.clock, self.registry, self.llm
             )

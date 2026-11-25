@@ -33,7 +33,7 @@ RENEGOTIATE_SYSTEM = (
 
 ESCALATION_SYSTEM = (
     "You write a short message matching the requested tone. "
-    "Return only the requested JSON object."
+    "Return only the message text."
 )
 
 

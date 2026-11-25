@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from agent.core.clock import FrozenClock
-from agent.core.escalation import evaluate
+from agent.core.escalation import escalation_message, evaluate
 from agent.core.monitor import Monitor
 from agent.executors.base import CompletionStatus, Slot
 from agent.executors.registry import ExecutorRegistry
@@ -82,6 +82,36 @@ def test_evaluate_beyond_threshold() -> None:
     assert decision.tone == "urgent"
 
 
+async def test_escalation_message_uses_tone() -> None:
+    task = make_task(2)
+    decision = evaluate(task, EscalationPolicy(misses_before_escalate=2))
+    user = User(name="User", email="user@example.com")
+    assert decision is not None
+
+    message = await escalation_message(
+        task, decision, user, FrozenClock(NOW), FakeLLMClient(["Firm reminder"])
+    )
+
+    assert message == "Firm reminder"
+
+
+async def test_escalation_message_falls_back_on_failure() -> None:
+    class BrokenLLM:
+        async def complete(self, system, user, **kwargs) -> str:
+            raise RuntimeError("offline")
+
+    task = make_task(2)
+    decision = evaluate(
+        task, EscalationPolicy(misses_before_escalate=2)
+    )
+    user = User(name="User", email="user@example.com")
+    assert decision is not None
+
+    message = await escalation_message(task, decision, user, FrozenClock(NOW), BrokenLLM())
+
+    assert message == "Please follow up: Task (Missed 2 times)."
+
+
 async def test_monitor_writes_escalation_event(tmp_path) -> None:
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'escalation.db'}")
     async with engine.begin() as connection:
@@ -138,8 +168,9 @@ async def test_monitor_writes_escalation_event(tmp_path) -> None:
         registry=registry,
         llm=FakeLLMClient(
             [
+                "Please follow up on the task",
                 '{"action": "keep_as_is", "new_time": null, "reason": "Wait", '
-                '"message_to_user": "Keeping the plan"}'
+                '"message_to_user": "Keeping the plan"}',
             ]
         ),
     )
