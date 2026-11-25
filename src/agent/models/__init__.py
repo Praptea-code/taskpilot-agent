@@ -1,3 +1,4 @@
+from agent.models.agent_session import AgentSession
 from agent.models.base import Base, TimestampMixin
 from agent.models.calendar_event import CalendarEvent
 from agent.models.check_in import CheckIn
@@ -11,6 +12,7 @@ from agent.models.user import User
 
 __all__ = [
     "ActionStatus",
+    "AgentSession",
     "Base",
     "CalendarEvent",
     "CheckIn",

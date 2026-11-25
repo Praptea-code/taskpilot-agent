@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -7,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from agent.core.clock import FrozenClock
 from agent.core.monitor import Monitor, sync_database_url
-from agent.executors.base import CompletionStatus
+from agent.executors.base import CompletionStatus, Slot
 from agent.executors.registry import ExecutorRegistry
+from agent.llm.fake import FakeLLMClient
 from agent.main import create_app
 from agent.models import (
     ActionStatus,
@@ -35,6 +37,19 @@ class FakeCompletionExecutor:
         self, action: ScheduledAction, session: AsyncSession | None = None
     ) -> CompletionStatus:
         return self.status
+
+    async def check_availability(
+        self, user, start, end, session=None
+    ) -> list[Slot]:
+        return [Slot(start + timedelta(hours=1), start + timedelta(hours=3))]
+
+    async def reschedule(
+        self, action: ScheduledAction, new_time: datetime, session=None
+    ) -> None:
+        return None
+
+    async def cancel(self, action: ScheduledAction, session=None) -> None:
+        return None
 
 
 def make_registry(status: CompletionStatus) -> ExecutorRegistry:
@@ -165,6 +180,18 @@ async def test_not_done_marks_missed_and_increments_miss_count(tmp_path) -> None
         maker,
         FrozenClock(NOW),
         registry=make_registry(CompletionStatus.NOT_DONE),
+        llm=FakeLLMClient(
+            [
+                json.dumps(
+                    {
+                        "action": "keep_as_is",
+                        "new_time": None,
+                        "reason": "Wait",
+                        "message_to_user": "Keeping the plan",
+                    }
+                )
+            ]
+        ),
     )
 
     await monitor.tick()

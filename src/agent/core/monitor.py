@@ -6,13 +6,25 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agent.channels.text_channel import TextChannel
 from agent.config import get_settings
 from agent.core.clock import Clock, SystemClock
+from agent.core.renegotiator import renegotiate
 from agent.core.state import finish_goal_if_done
 from agent.db.session import get_sessionmaker
 from agent.executors.base import CompletionStatus
 from agent.executors.registry import ExecutorRegistry, build_default_registry
-from agent.models import ActionStatus, Notification, ScheduledAction, Task, TaskStatus
+from agent.llm.base import LLMClient
+from agent.llm.factory import get_llm
+from agent.models import (
+    ActionStatus,
+    AgentSession,
+    Notification,
+    ScheduledAction,
+    Task,
+    TaskStatus,
+    User,
+)
 
 
 @dataclass(frozen=True)
@@ -44,11 +56,13 @@ class Monitor:
         clock: Clock | None = None,
         config: MonitorConfig | None = None,
         registry: ExecutorRegistry | None = None,
+        llm: LLMClient | None = None,
     ) -> None:
         self.maker = maker
         self.clock = clock or SystemClock()
         self.config = config or MonitorConfig()
         self.registry = registry or ExecutorRegistry()
+        self.llm = llm or get_llm()
         self.scheduler = AsyncIOScheduler()
 
     async def start(self, jobstore_url: str) -> None:
@@ -100,6 +114,27 @@ class Monitor:
             action.status = ActionStatus.MISSED
             task.status = TaskStatus.MISSED
             task.miss_count += 1
+            user = await session.get(User, action.user_id)
+            if user is None:
+                await session.commit()
+                return
+            result = await renegotiate(
+                session, action, user, self.clock, self.registry, self.llm
+            )
+            await TextChannel(session).send(user, result.decision.message_to_user)
+            if result.decision.action == "ask_user":
+                session.add(
+                    AgentSession(
+                        user_id=user.id,
+                        goal_id=task.goal_id,
+                        scheduled_action_id=action.id,
+                        status="awaiting_reply",
+                        context={
+                            "reason": result.decision.reason,
+                            "message": result.decision.message_to_user,
+                        },
+                    )
+                )
         elif status == CompletionStatus.UNKNOWN:
             action.status = ActionStatus.IN_PROGRESS
             session.add(
