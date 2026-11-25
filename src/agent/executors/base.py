@@ -3,6 +3,8 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from agent.models import ScheduledAction, User
 
 
@@ -30,13 +32,21 @@ class ActionExecutor(Protocol):
     name: str
 
     async def check_availability(
-        self, user: User, start: datetime, end: datetime
+        self, user: User, start: datetime, end: datetime, session: AsyncSession | None = None
     ) -> list[Slot]: ...
 
-    async def execute(self, action: ScheduledAction) -> ExecutionResult: ...
+    async def execute(
+        self, action: ScheduledAction, session: AsyncSession | None = None
+    ) -> ExecutionResult: ...
 
-    async def check_completion(self, action: ScheduledAction) -> CompletionStatus: ...
+    async def check_completion(
+        self, action: ScheduledAction, session: AsyncSession | None = None
+    ) -> CompletionStatus: ...
 
-    async def cancel(self, action: ScheduledAction) -> None: ...
+    async def cancel(
+        self, action: ScheduledAction, session: AsyncSession | None = None
+    ) -> None: ...
 
-    async def reschedule(self, action: ScheduledAction, new_time: datetime) -> None: ...
+    async def reschedule(
+        self, action: ScheduledAction, new_time: datetime, session: AsyncSession | None = None
+    ) -> None: ...

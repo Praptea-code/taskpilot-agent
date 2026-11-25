@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -40,6 +42,16 @@ class LocalCalendarExecutor:
     def __init__(self, maker: async_sessionmaker[AsyncSession] | None = None) -> None:
         self._maker = maker or get_sessionmaker()
 
+    @asynccontextmanager
+    async def _scope(
+        self, session: AsyncSession | None
+    ) -> AsyncIterator[tuple[AsyncSession, bool]]:
+        if session is not None:
+            yield session, False
+        else:
+            async with self._maker() as own:
+                yield own, True
+
     def working_windows(self, user: User, start: datetime, end: datetime) -> list[Slot]:
         zone = ZoneInfo(user.timezone)
         prefs = user.notification_prefs or {}
@@ -67,10 +79,14 @@ class LocalCalendarExecutor:
         return windows
 
     async def check_availability(
-        self, user: User, start: datetime, end: datetime
+        self,
+        user: User,
+        start: datetime,
+        end: datetime,
+        session: AsyncSession | None = None,
     ) -> list[Slot]:
-        async with self._maker() as session:
-            result = await session.execute(
+        async with self._scope(session) as (active, _):
+            result = await active.execute(
                 select(CalendarEvent).where(
                     CalendarEvent.user_id == user.id,
                     CalendarEvent.start_at < end,
@@ -83,23 +99,29 @@ class LocalCalendarExecutor:
             ]
         return subtract_busy(self.working_windows(user, start, end), busy)
 
-    async def execute(self, action: ScheduledAction) -> ExecutionResult:
+    async def execute(
+        self, action: ScheduledAction, session: AsyncSession | None = None
+    ) -> ExecutionResult:
         end_at = action.scheduled_at + timedelta(minutes=action.duration_minutes)
-        async with self._maker() as session:
+        async with self._scope(session) as (active, owns):
             event = CalendarEvent(
                 user_id=action.user_id,
                 title=f"Action {action.id}",
                 start_at=action.scheduled_at,
                 end_at=end_at,
             )
-            session.add(event)
-            await session.commit()
-            await session.refresh(event)
+            active.add(event)
+            await active.flush()
+            await active.refresh(event)
+            if owns:
+                await active.commit()
             return ExecutionResult(external_ref=str(event.id))
 
-    async def check_completion(self, action: ScheduledAction) -> CompletionStatus:
-        async with self._maker() as session:
-            result = await session.execute(
+    async def check_completion(
+        self, action: ScheduledAction, session: AsyncSession | None = None
+    ) -> CompletionStatus:
+        async with self._scope(session) as (active, _):
+            result = await active.execute(
                 select(CalendarEvent).where(
                     CalendarEvent.user_id == action.user_id,
                     CalendarEvent.title == f"Action {action.id}",
@@ -110,9 +132,11 @@ class LocalCalendarExecutor:
             return CompletionStatus.UNKNOWN
         return CompletionStatus.DONE if event.done else CompletionStatus.NOT_DONE
 
-    async def cancel(self, action: ScheduledAction) -> None:
-        async with self._maker() as session:
-            result = await session.execute(
+    async def cancel(
+        self, action: ScheduledAction, session: AsyncSession | None = None
+    ) -> None:
+        async with self._scope(session) as (active, owns):
+            result = await active.execute(
                 select(CalendarEvent).where(
                     CalendarEvent.user_id == action.user_id,
                     CalendarEvent.title == f"Action {action.id}",
@@ -120,13 +144,19 @@ class LocalCalendarExecutor:
             )
             event = result.scalar_one_or_none()
             if event is not None:
-                await session.delete(event)
-                await session.commit()
+                await active.delete(event)
+                if owns:
+                    await active.commit()
 
-    async def reschedule(self, action: ScheduledAction, new_time: datetime) -> None:
+    async def reschedule(
+        self,
+        action: ScheduledAction,
+        new_time: datetime,
+        session: AsyncSession | None = None,
+    ) -> None:
         end_at = new_time + timedelta(minutes=action.duration_minutes)
-        async with self._maker() as session:
-            result = await session.execute(
+        async with self._scope(session) as (active, owns):
+            result = await active.execute(
                 select(CalendarEvent).where(
                     CalendarEvent.user_id == action.user_id,
                     CalendarEvent.title == f"Action {action.id}",
@@ -136,4 +166,5 @@ class LocalCalendarExecutor:
             if event is not None:
                 event.start_at = new_time
                 event.end_at = end_at
-                await session.commit()
+                if owns:
+                    await active.commit()

@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from agent.executors.base import ActionExecutor, CompletionStatus, ExecutionResult, Slot
 from agent.executors.registry import ExecutorRegistry
 from agent.models import ScheduledAction, User
@@ -9,20 +11,35 @@ class DummyExecutor:
     name = "dummy"
 
     async def check_availability(
-        self, user: User, start: datetime, end: datetime
+        self,
+        user: User,
+        start: datetime,
+        end: datetime,
+        session: AsyncSession | None = None,
     ) -> list[Slot]:
         return [Slot(start, end)]
 
-    async def execute(self, action: ScheduledAction) -> ExecutionResult:
+    async def execute(
+        self, action: ScheduledAction, session: AsyncSession | None = None
+    ) -> ExecutionResult:
         return ExecutionResult(external_ref="dummy-ref")
 
-    async def check_completion(self, action: ScheduledAction) -> CompletionStatus:
+    async def check_completion(
+        self, action: ScheduledAction, session: AsyncSession | None = None
+    ) -> CompletionStatus:
         return CompletionStatus.DONE
 
-    async def cancel(self, action: ScheduledAction) -> None:
+    async def cancel(
+        self, action: ScheduledAction, session: AsyncSession | None = None
+    ) -> None:
         return None
 
-    async def reschedule(self, action: ScheduledAction, new_time: datetime) -> None:
+    async def reschedule(
+        self,
+        action: ScheduledAction,
+        new_time: datetime,
+        session: AsyncSession | None = None,
+    ) -> None:
         return None
 
 
