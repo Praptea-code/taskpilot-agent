@@ -18,3 +18,4 @@
 - Commit 35: reply checks use a local `inbox_messages` table, with a three-day minimum gap and weekday-only availability for follow-ups.
 - Commit 36: CRM updates are stage transitions stored in `Task.payload`, and completion means the lead already reached the target stage.
 - Commit 37: domain examples and payload builders live in `executors.domain_prompts`, so core only calls generic helpers.
+- Commit 38: no core refactor was needed because domain words only appear in imports and identifiers, not string literals.
