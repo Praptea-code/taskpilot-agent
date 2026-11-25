@@ -20,16 +20,24 @@ The API listens on `http://localhost:8000`. Check it with:
 curl http://localhost:8000/health
 ```
 
-Create a user and goal with the `X-User-Id` header:
+Create a user and keep the one-time API key from the response:
+
+```
+curl -X POST http://localhost:8000/users ^
+  -H "Content-Type: application/json" ^
+  -d "{\"name\": \"Demo User\", \"email\": \"demo@example.com\"}"
+```
+
+Use that key as a bearer token:
 
 ```
 curl -X POST http://localhost:8000/goals ^
   -H "Content-Type: application/json" ^
-  -H "X-User-Id: 1" ^
+  -H "Authorization: Bearer YOUR_API_KEY" ^
   -d "{\"raw_input_text\": \"Prepare the quarterly review\", \"domain\": \"general\", \"auto_plan\": false}"
 
 curl -X POST http://localhost:8000/goals/1/plan ^
-  -H "X-User-Id: 1"
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 Start the web client:
@@ -86,7 +94,6 @@ Set `LLM_PROVIDER=fake` for deterministic offline tests and demos.
 | `LLM_FALLBACK_MODEL` | `llama3.2:3b` | Fallback model |
 | `LLM_BASE_URL` | `http://localhost:11434` | OpenAI compatible base URL |
 | `LLM_API_KEY` | empty | Key for hosted compatible endpoints |
-| `API_KEY` | empty | When set, every API request needs `X-API-Key` |
 | `TIMEZONE` | `UTC` | Default user timezone |
 | `GRACE_MINUTES` | `10` | Late reply grace window |
 | `SMTP_CONSOLE` | `true` | Print email instead of sending it |
@@ -94,6 +101,7 @@ Set `LLM_PROVIDER=fake` for deterministic offline tests and demos.
 | `SMTP_PORT` | `1025` | SMTP port |
 | `WHISPER_MODEL` | `base.en` | faster-whisper model name |
 | `PIPER_MODEL` | empty | Piper ONNX model path |
+| `DEV_MODE` | `true` | Allows `X-User-Id` for local tests only |
 
 Copy `.env.example` to `.env` and edit only the values you need.
 

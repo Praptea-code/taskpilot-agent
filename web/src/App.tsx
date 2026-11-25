@@ -42,7 +42,7 @@ function App() {
   const baseHeaders = useCallback(() => {
     const headers: Record<string, string> = { "X-User-Id": "1" };
     if (apiKey) {
-      headers["X-API-Key"] = apiKey;
+      headers.Authorization = `Bearer ${apiKey}`;
     }
     return headers;
   }, [apiKey]);

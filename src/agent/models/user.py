@@ -19,5 +19,6 @@ class User(TimestampMixin, Base):
     notification_prefs: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     escalation_policy: Mapped[dict[str, object]] = mapped_column(JSON, default=dict)
     api_key_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    api_key_salt: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     goals: Mapped[list["Goal"]] = relationship(back_populates="user")

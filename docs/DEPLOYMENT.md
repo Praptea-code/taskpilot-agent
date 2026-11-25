@@ -16,7 +16,7 @@ Use a reverse proxy with TLS in production. Keep the API bound to localhost or a
 
 ## Environment
 
-Set `API_KEY` to require `X-API-Key` on every request. Use a long random value and keep it out of source control.
+Set `DEV_MODE=false` in production so only bearer API keys are accepted. Create users with `POST /users` and store the returned one-time key in the client. The server keeps only a salted SHA-256 hash.
 
 For hosted free LLM tiers, set `LLM_PROVIDER=openai_compat` plus `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`. For local inference, keep `LLM_PROVIDER=ollama` and point `OLLAMA_HOST` at the Ollama service.
 
@@ -42,7 +42,7 @@ Back up the database before upgrades. For SQLite, copy the database file while t
 
 ## Health checks
 
-Use `GET /health` for liveness. It returns the application version. It is protected by `API_KEY` when one is configured.
+Use `GET /health` for liveness. It returns the application version and does not require a user API key.
 
 Monitor logs for failed check-ins, escalation level changes, and notification delivery errors. The scheduler writes `ScheduledAction` rows, so a stalled process can also be detected by querying for actions with a `scheduled_at` far in the past.
 

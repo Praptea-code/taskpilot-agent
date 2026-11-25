@@ -1,9 +1,8 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from agent import __version__
 from agent.api.actions import router as actions_router
@@ -12,6 +11,7 @@ from agent.api.goals import router as goals_router
 from agent.api.inbound import router as inbound_router
 from agent.api.notifications import router as notifications_router
 from agent.api.sessions import router as sessions_router
+from agent.api.users import router as users_router
 from agent.api.voice import router as voice_router
 from agent.config import get_settings
 from agent.core.clock import SystemClock
@@ -47,12 +47,7 @@ def create_app() -> FastAPI:
     )
     app.state.monitor = monitor
 
-    @app.middleware("http")
-    async def api_key_guard(request: Request, call_next):
-        if settings.api_key and request.headers.get("x-api-key") != settings.api_key:
-            return JSONResponse(status_code=401, content={"detail": "Invalid API key"})
-        return await call_next(request)
-
+    app.include_router(users_router)
     app.include_router(goals_router)
     app.include_router(inbound_router)
     app.include_router(checkins_router)
