@@ -14,3 +14,14 @@ class ExtractedGoal(BaseModel):
     deadline: str | None = None
     constraints: GoalConstraints = Field(default_factory=GoalConstraints)
     clarifying_question: str | None = None
+
+
+class ExtractedTask(BaseModel):
+    description: str
+    estimated_effort_minutes: int
+    action_type: str
+    order: int
+
+
+class ExtractedTasks(BaseModel):
+    tasks: list[ExtractedTask]
