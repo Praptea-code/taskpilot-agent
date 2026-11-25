@@ -27,3 +27,4 @@
 - Commit 44: the voice endpoint reuses the inbound pipeline and reports whether TTS returned audio or plain text bytes.
 - Commit 45: the React client uses the Vite dev proxy so the browser never needs a hard-coded API host.
 - Commit 46: API key checking is a middleware so every route is covered without per-endpoint dependencies.
+- Commit 47: deployment guidance assumes one scheduler process because duplicate monitor replicas would double check-in ticks.

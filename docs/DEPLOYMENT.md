@@ -1,0 +1,81 @@
+# Deployment
+
+## Application process
+
+Install runtime dependencies and apply migrations before starting the API:
+
+```
+python -m pip install -e .
+python -m alembic upgrade head
+uvicorn agent.main:app --host 0.0.0.0 --port 8000
+```
+
+Do not run more than one scheduler-enabled process against the same database. The in-process scheduler reuses one `ScheduledAction` per check-in cycle, so multiple replicas would duplicate monitor ticks.
+
+Use a reverse proxy with TLS in production. Keep the API bound to localhost or a private network if the proxy runs on the same host.
+
+## Environment
+
+Set `API_KEY` to require `X-API-Key` on every request. Use a long random value and keep it out of source control.
+
+For hosted free LLM tiers, set `LLM_PROVIDER=openai_compat` plus `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL`. For local inference, keep `LLM_PROVIDER=ollama` and point `OLLAMA_HOST` at the Ollama service.
+
+Set `SMTP_CONSOLE=false` to send real email. Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, and `SMTP_SENDER`. Replies are read from the local `inbox_messages` table, so an external mail integration should insert into that table.
+
+Voice requires `python -m pip install -e ".[voice]"` and a Piper voice file. Set `WHISPER_MODEL` and `PIPER_MODEL`. Without Piper, voice replies contain plain text bytes.
+
+## Database
+
+SQLite is the default. For Postgres, set:
+
+```
+DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:5432/taskpilot
+```
+
+Create the schema on a fresh deployment with:
+
+```
+python -m alembic upgrade head
+```
+
+Back up the database before upgrades. For SQLite, copy the database file while the service is stopped. For Postgres, use `pg_dump` and keep the output outside the application directory.
+
+## Health checks
+
+Use `GET /health` for liveness. It returns the application version. It is protected by `API_KEY` when one is configured.
+
+Monitor logs for failed check-ins, escalation level changes, and notification delivery errors. The scheduler writes `ScheduledAction` rows, so a stalled process can also be detected by querying for actions with a `scheduled_at` far in the past.
+
+## Web client
+
+Build static assets with:
+
+```
+cd web
+npm install
+npm run build
+```
+
+Serve `web/dist` through any static file server. The Vite dev proxy is only for development. In production, point the client at the public API origin and allow that browser origin in the `CORSMiddleware` list in `agent.main`.
+
+## systemd example
+
+```
+[Unit]
+Description=TaskPilot Agent
+After=network.target
+
+[Service]
+User=taskpilot
+WorkingDirectory=/opt/taskpilot
+EnvironmentFile=/opt/taskpilot/.env
+ExecStart=/opt/taskpilot/.venv/bin/uvicorn agent.main:app --host 127.0.0.1 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Docker notes
+
+Build an image from the project root and run one container. Mount a volume for SQLite or use Postgres. Pass configuration with environment variables or an env file. Do not bake `.env`, API keys, or database files into the image.
